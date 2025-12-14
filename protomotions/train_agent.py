@@ -229,7 +229,7 @@ def create_parser():
         help="Enable SLURM autoresume functionality",
     )
     parser.add_argument(
-        "--ngpu",
+        "--gpu_ids",
         type=str,
         default="0",
         help="GPU ID(s) to use for training. "
@@ -779,7 +779,7 @@ def main():
     from lightning.fabric import Fabric
 
     # Parse GPU devices (specifies GPU ID(s) to use)
-    devices = parse_gpu_devices(args.ngpu)
+    devices = parse_gpu_devices(args.gpu_ids)
     print(f"Using devices: {devices}")
 
     fabric_config = FabricConfig(
@@ -992,7 +992,7 @@ def _handle_create_config_only(
     from copy import deepcopy
 
     # Parse GPU devices (specifies GPU ID(s) to use)
-    devices = parse_gpu_devices(args.ngpu)
+    devices = parse_gpu_devices(args.gpu_ids)
     print(f"Using devices: {devices}")
 
     # Create minimal fabric config (no loggers/callbacks needed for config-only mode)

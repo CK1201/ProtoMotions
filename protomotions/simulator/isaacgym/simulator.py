@@ -89,8 +89,10 @@ class IsaacGymSimulator(Simulator):
             device_index = self.device.index
 
         self._graphics_device_id = device_index
-        if self.headless is True:
-            self._graphics_device_id = 0
+        # Note: In headless mode, we still need to use the same GPU for graphics context
+        # Setting it to 0 can cause issues if GPU 0 is unavailable or out of memory
+        # if self.headless is True:
+        #     self._graphics_device_id = 0
 
         self._gym = gymapi.acquire_gym()
 
