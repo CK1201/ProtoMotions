@@ -280,11 +280,17 @@ def parse_gpu_devices(ngpu_str):
     
     Args:
         ngpu_str: String that specifies GPU ID(s):
-            - A single GPU ID (e.g., "5") -> returns "5" (use GPU 5)
-            - Comma-separated GPU IDs (e.g., "0,1,2") -> returns "0,1,2" (use specific GPUs)
+            - A single GPU ID (e.g., "5") -> returns [5] (list with single GPU)
+            - Comma-separated GPU IDs (e.g., "0,1,2") -> returns [0,1,2] (list of GPUs)
     
     Returns:
-        str: GPU ID(s) in format suitable for FabricConfig.devices
+        list[int]: GPU ID(s) as list for FabricConfig.devices
+    
+    Note:
+        Lightning Fabric interprets devices parameter as:
+        - int: number of GPUs to use (e.g., 5 = use first 5 GPUs: 0,1,2,3,4)
+        - list[int]: specific GPU IDs (e.g., [5] = use only GPU 5)
+        We always return a list to specify exact GPU IDs.
     """
     # Remove whitespace
     ngpu_str = ngpu_str.strip()
@@ -294,20 +300,19 @@ def parse_gpu_devices(ngpu_str):
         # Validate that all parts are integers
         try:
             gpu_ids = [int(x.strip()) for x in ngpu_str.split(",")]
-            # Return as comma-separated string for Lightning Fabric
-            return ",".join(str(x) for x in gpu_ids)
+            return gpu_ids
         except ValueError:
             raise ValueError(
                 f"Invalid GPU IDs format: {ngpu_str}. "
                 f"Expected format: '0,1,2' or a single GPU ID like '5'"
             )
     else:
-        # Single GPU ID - return as string
+        # Single GPU ID - return as list with one element
         try:
             # Validate it's a valid integer
             gpu_id = int(ngpu_str)
-            # Return as string for consistency
-            return str(gpu_id)
+            # Return as list to specify exact GPU ID (not count)
+            return [gpu_id]
         except ValueError:
             raise ValueError(
                 f"Invalid GPU ID format: {ngpu_str}. "
@@ -775,6 +780,7 @@ def main():
 
     # Parse GPU devices (specifies GPU ID(s) to use)
     devices = parse_gpu_devices(args.ngpu)
+    print(f"Using devices: {devices}")
 
     fabric_config = FabricConfig(
         devices=devices,
@@ -987,6 +993,7 @@ def _handle_create_config_only(
 
     # Parse GPU devices (specifies GPU ID(s) to use)
     devices = parse_gpu_devices(args.ngpu)
+    print(f"Using devices: {devices}")
 
     # Create minimal fabric config (no loggers/callbacks needed for config-only mode)
     fabric_config = FabricConfig(
