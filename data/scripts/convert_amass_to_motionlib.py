@@ -184,11 +184,17 @@ Examples:
             config = yaml.safe_load(f)
 
         # Update file paths to be absolute (relative to amass_root_dir)
+        # Resolve to absolute path to avoid issues when motion_lib.py joins paths
+        # motion_lib.py will join the file path with the YAML directory, so we need absolute paths
+        amass_root_abs = Path(args.amass_root_dir).resolve()
         for motion in config.get("motions", []):
             original_file = motion["file"]
             # The file paths in the config are relative to amass_root_dir
-            absolute_path = args.amass_root_dir / original_file
-            motion["file"] = str(absolute_path)
+            absolute_path = amass_root_abs / original_file
+            # Use resolve() to get absolute path and normalize it
+            # This ensures the path is absolute and normalized (handles '..' and '.')
+            resolved_path = absolute_path.resolve()
+            motion["file"] = str(resolved_path)
 
         # Write updated config to temp file
         temp_yaml = args.output_dir / f".tmp_{config_name}.yaml"

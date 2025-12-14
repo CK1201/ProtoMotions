@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 from typing import Optional
+import os
+from pathlib import Path
 from protomotions.components.terrains.terrain import Terrain
 from protomotions.robot_configs.base import RobotConfig
 import isaaclab.sim as sim_utils
@@ -135,10 +137,39 @@ class SceneCfg(InteractiveSceneCfg):
             )
 
         # articulation
+        # Build absolute path to USD file
+        usd_file_path = f"{robot_config.asset.asset_root}/{robot_config.asset.usd_asset_file_name}"
+        usd_file_path = os.path.abspath(usd_file_path)
+        usd_file_dir = os.path.dirname(usd_file_path)
+        
+        # Set USD asset resolver to handle @configuration/... relative paths
+        # USD files use @configuration/... paths that are relative to the USD file's directory
+        # We need to configure the USD resolver to resolve these paths correctly
+        try:
+            from pxr import Ar
+            # Configure the resolver to use the USD file's directory as the anchor
+            # for resolving @configuration/... paths
+            resolver = Ar.GetResolver()
+            # Create a context with the USD file's directory as the working directory
+            # This allows @configuration/... to resolve to configuration/... relative to the USD file
+            context = resolver.CreateDefaultContextForAsset(usd_file_path)
+            resolver.SetDefaultContext(context)
+        except (ImportError, AttributeError):
+            # If pxr is not available or method doesn't exist, try alternative approach
+            # Set environment variable that USD resolver might use
+            import os as os_module
+            # USD resolver may use PXR_AR_DEFAULT_SEARCH_PATH or similar
+            # Add the USD file directory to the search path
+            current_search_path = os_module.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", "")
+            if usd_file_dir not in current_search_path:
+                os_module.environ["PXR_AR_DEFAULT_SEARCH_PATH"] = (
+                    current_search_path + ":" + usd_file_dir if current_search_path else usd_file_dir
+                )
+        
         self.robot = ArticulationCfg(
             prim_path="/World/envs/env_.*/Robot",
             spawn=sim_utils.UsdFileCfg(
-                usd_path=f"{robot_config.asset.asset_root}/{robot_config.asset.usd_asset_file_name}",
+                usd_path=usd_file_path,
                 activate_contact_sensors=activate_contact_sensors,
                 rigid_props=sim_utils.RigidBodyPropertiesCfg(
                     disable_gravity=robot_config.asset.disable_gravity,

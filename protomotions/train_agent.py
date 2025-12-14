@@ -229,7 +229,11 @@ def create_parser():
         help="Enable SLURM autoresume functionality",
     )
     parser.add_argument(
-        "--ngpu", type=int, default=1, help="Number of GPUs to use for training"
+        "--ngpu",
+        type=str,
+        default="0",
+        help="GPU ID(s) to use for training. "
+        "Can be a single GPU ID (e.g., '5' for GPU 5) or a comma-separated list of GPU IDs (e.g., '0,1,2' for GPUs 0, 1, and 2)",
     )
     parser.add_argument(
         "--nodes", type=int, default=1, help="Number of nodes for distributed training"
@@ -268,6 +272,47 @@ def create_parser():
     )
 
     return parser
+
+
+def parse_gpu_devices(ngpu_str):
+    """
+    Parse GPU devices string to appropriate format for Lightning Fabric.
+    
+    Args:
+        ngpu_str: String that specifies GPU ID(s):
+            - A single GPU ID (e.g., "5") -> returns "5" (use GPU 5)
+            - Comma-separated GPU IDs (e.g., "0,1,2") -> returns "0,1,2" (use specific GPUs)
+    
+    Returns:
+        str: GPU ID(s) in format suitable for FabricConfig.devices
+    """
+    # Remove whitespace
+    ngpu_str = ngpu_str.strip()
+    
+    # If it contains a comma, it's a list of specific GPU IDs
+    if "," in ngpu_str:
+        # Validate that all parts are integers
+        try:
+            gpu_ids = [int(x.strip()) for x in ngpu_str.split(",")]
+            # Return as comma-separated string for Lightning Fabric
+            return ",".join(str(x) for x in gpu_ids)
+        except ValueError:
+            raise ValueError(
+                f"Invalid GPU IDs format: {ngpu_str}. "
+                f"Expected format: '0,1,2' or a single GPU ID like '5'"
+            )
+    else:
+        # Single GPU ID - return as string
+        try:
+            # Validate it's a valid integer
+            gpu_id = int(ngpu_str)
+            # Return as string for consistency
+            return str(gpu_id)
+        except ValueError:
+            raise ValueError(
+                f"Invalid GPU ID format: {ngpu_str}. "
+                f"Expected a GPU ID (e.g., '5') or comma-separated GPU IDs (e.g., '0,1,2')"
+            )
 
 
 # Parse arguments first (argparse is safe, doesn't import torch)
@@ -728,8 +773,11 @@ def main():
     from protomotions.utils.fabric_config import FabricConfig
     from lightning.fabric import Fabric
 
+    # Parse GPU devices (specifies GPU ID(s) to use)
+    devices = parse_gpu_devices(args.ngpu)
+
     fabric_config = FabricConfig(
-        devices=args.ngpu,
+        devices=devices,
         num_nodes=args.nodes,
         loggers=loggers,
         callbacks=callbacks,
@@ -937,9 +985,12 @@ def _handle_create_config_only(
     from protomotions.utils.inference_utils import apply_all_inference_overrides
     from copy import deepcopy
 
+    # Parse GPU devices (specifies GPU ID(s) to use)
+    devices = parse_gpu_devices(args.ngpu)
+
     # Create minimal fabric config (no loggers/callbacks needed for config-only mode)
     fabric_config = FabricConfig(
-        devices=args.ngpu,
+        devices=devices,
         num_nodes=args.nodes,
         loggers=[],
         callbacks=[],

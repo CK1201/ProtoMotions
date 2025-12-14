@@ -342,6 +342,7 @@ def main(
     folder_names = [
         f.path.split("/")[-1] for f in os.scandir(amass_root_dir) if f.is_dir()
     ]
+    print(f"Folder names: {folder_names}")
 
     kinematic_info = extract_kinematic_info(
         f"protomotions/data/assets/mjcf/{humanoid_type}_humanoid.xml"
@@ -353,6 +354,7 @@ def main(
     total_files_to_process = 0
     processed_files = 0
     for folder_name in folder_names:
+        print(f"Processing folder {folder_name}")
         if "smpl" in folder_name:
             continue
         data_dir = amass_root_dir / folder_name
@@ -426,7 +428,7 @@ def main(
 
             # Check if the output file already exists
             if not force_remake and outpath.exists():
-                # print(f"Skipping {filename} as it already exists.")
+                print(f"Skipping {filename} as it already exists.")
                 continue
 
             # Create the output directory if it doesn't exist
@@ -437,7 +439,22 @@ def main(
                 motion_data = np.load(filename)
 
                 # gender = "neutral"      # assume neutral gender with beta = 0
-                pose_aa = motion_data["poses"]
+                # Support both AMASS format (poses) and custom format (root_orient + pose_body)
+                if "poses" in motion_data:
+                    # Standard AMASS format: poses contains root_orient + pose_body concatenated
+                    pose_aa = motion_data["poses"]
+                elif "root_orient" in motion_data and "pose_body" in motion_data:
+                    # Custom format: root_orient and pose_body are separate
+                    root_orient = motion_data["root_orient"]  # (N, 3)
+                    pose_body = motion_data["pose_body"]  # (N, 63) for SMPL
+                    # Concatenate root_orient and pose_body to match AMASS format
+                    pose_aa = np.concatenate([root_orient, pose_body], axis=1)  # (N, 66)
+                else:
+                    raise KeyError(
+                        f"Expected 'poses' or ('root_orient' + 'pose_body') in {filename}, "
+                        f"but found keys: {list(motion_data.keys())}"
+                    )
+                
                 amass_trans = motion_data["trans"]
                 if humanoid_type == "smplx":
                     # Load the fps from the yaml file
@@ -470,8 +487,12 @@ def main(
                 else:
                     if "mocap_framerate" in motion_data:
                         mocap_fr = motion_data["mocap_framerate"]
-                    else:
+                    elif "mocap_frame_rate" in motion_data:
                         mocap_fr = motion_data["mocap_frame_rate"]
+                    else:
+                        # Default to 30 FPS if not specified (common for custom generated files)
+                        print(f"Warning: No framerate found in {filename}, defaulting to 30 FPS")
+                        mocap_fr = 30.0
 
             elif filename.suffix == ".pkl" and "samp" in str(filename):
                 with open(filename, "rb") as f:

@@ -264,15 +264,15 @@ def main(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # Get kinematic info for the specified robot
-    mjcf_path = f"protomotions/data/assets/mjcf/{robot_type}.xml"
+    # Get robot config to find foot link names (for contact labeling)
+    robot_cfg = robot_config(robot_type)
+    
+    # Get kinematic info for the specified robot using the correct asset path
+    mjcf_path = os.path.join(robot_cfg.asset.asset_root, robot_cfg.asset.asset_file_name)
     if not os.path.exists(mjcf_path):
         raise FileNotFoundError(f"MJCF file not found at {mjcf_path}")
 
     kinematic_info = extract_kinematic_info(mjcf_path)
-
-    # Get robot config to find foot link names (for contact labeling)
-    robot_cfg = robot_config(robot_type)
     left_foot_name = robot_cfg.common_naming_to_robot_body_names[
         "all_left_foot_bodies"
     ][0]
